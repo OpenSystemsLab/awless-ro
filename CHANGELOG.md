@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- `list loggroups`: CloudWatch Logs log groups with class, retention, size and creation time. (#59)
+
 ### Changed
 
 - `switch` refuses `-p` and `-r` (exit 1): pass the profile and region as arguments,
