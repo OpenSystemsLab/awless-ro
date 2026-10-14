@@ -47,6 +47,14 @@ go mod verify
 go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 ```
 
+### Where CI runs
+
+On GitHub-hosted runners only. `build` runs every gate above on `ubuntu-latest`;
+`arm64` runs the tests (with `-race`) and the built binary natively on
+`ubuntu-24.04-arm` and `macos-latest` (Apple Silicon), because the arm64 release
+artefacts are cross-compiled and would otherwise never be executed before they ship.
+The Release workflow runs the same `arm64` job before it publishes anything.
+
 ## Dependencies and the supply chain
 
 This project inherited its dependency list from a repository abandoned in 2018. One

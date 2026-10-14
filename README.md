@@ -238,6 +238,14 @@ go install github.com/theazz/awless-ro@latest
 Or download a binary from
 [releases](https://github.com/theazz/awless-ro/releases) and verify it:
 
+| Platform | Archive |
+|---|---|
+| macOS, Apple Silicon | `awless-ro-darwin-arm64.tar.gz` |
+| Linux, arm64 (Graviton and other 64-bit ARM) | `awless-ro-linux-arm64.tar.gz` |
+| macOS, Intel | `awless-ro-darwin-amd64.tar.gz` |
+| Linux, x86-64 | `awless-ro-linux-amd64.tar.gz` |
+| Windows, x86-64 | `awless-ro-windows-amd64.zip` |
+
 ```sh
 shasum -a 256 -c SHA256SUMS --ignore-missing
 ```
