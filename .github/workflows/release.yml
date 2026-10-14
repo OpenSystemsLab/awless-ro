@@ -82,8 +82,9 @@ jobs:
   # nothing else, stored here as the HOMEBREW_TAP_DEPLOY_KEY secret.
   homebrew:
     needs: release
-    # A pre-release (v1.2.0-rc.1) is not what `brew install` should hand people.
-    if: ${{ !contains(github.ref_name, '-') }}
+    # A pre-release (v1.2.0-rc.1) is not what `brew install` should hand people. The
+    # tap is theazz's, so a fork's release never tries to update it.
+    if: ${{ github.repository == 'theazz/awless-ro' && !contains(github.ref_name, '-') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
