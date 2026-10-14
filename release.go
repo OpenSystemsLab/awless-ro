@@ -46,10 +46,12 @@ var (
 )
 
 // 386 was dropped and arm64 added: Apple Silicon and Graviton are the platforms
-// that matter now, and 32-bit x86 has not been a realistic target for years.
+// that matter now, and 32-bit x86 has not been a realistic target for years. arm64
+// is listed first, as the default build (see the Makefile); the order is for the
+// reader only, the builds run concurrently and the checksums are sorted.
 var builds = map[string][]string{
-	"darwin":  {"amd64", "arm64"},
-	"linux":   {"amd64", "arm64"},
+	"darwin":  {"arm64", "amd64"},
+	"linux":   {"arm64", "amd64"},
 	"windows": {"amd64"},
 }
 

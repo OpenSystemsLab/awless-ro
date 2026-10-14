@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- `make build` builds for arm64 unless `GOARCH` says otherwise; `release.go` and the
+  README's install section list the arm64 archives first.
+- CI and the release workflow also run the tests and the binary on arm64, natively,
+  on GitHub's Linux arm64 and Apple Silicon runners.
+
 ## v0.5.0
 
 **Breaking:** `switch` with `-p` or `-r` now exits 1 without saving anything. Pass the
