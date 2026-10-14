@@ -8,7 +8,7 @@
   `switch`, `sync`, `version`, newline-delimited JSON from `tail`, and `{"id"}` from
   `search images --latest-id`. `--format` is now a global flag; `list --format` is
   unchanged. See [JSON output](README.md#json-output). (OpenSystemsLab/awless-ro#1)
-- `list --ids --format json` prints an array of ids.
+- `list --ids --format json` prints an array of ids (per type for a service).
 
 ### Changed
 
@@ -21,6 +21,11 @@
 
 ### Fixed
 
+- `sync` says which services could not be read, on stderr without `-v` and as
+  `"error"` in JSON, and exits 1 when nothing could be synced, instead of reporting
+  an account with nothing in it.
+- `show` exits 1 with "not found" when the resource is gone after the refresh,
+  instead of exiting 0 having printed nothing.
 - `list <type> --format json` with no results prints `[]` instead of `null`.
 - `list <service> --format json` lists each type's resources in id order.
 - A property holding a float that is not a number no longer fails the whole JSON

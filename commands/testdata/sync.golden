@@ -11,5 +11,6 @@
     "s3object": "aws.storage.s3object.sync"
    }
   }
- ]
+ ],
+ "errors": []
 }

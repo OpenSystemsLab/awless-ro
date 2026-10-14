@@ -63,7 +63,7 @@ func init() {
 	RootCmd.RegisterFlagCompletionFunc("aws-region", completeRegions)
 	RootCmd.RegisterFlagCompletionFunc("aws-profile", completeProfiles)
 	RootCmd.RegisterFlagCompletionFunc("color", fixedCompletion("auto", "never", "always"))
-	RootCmd.RegisterFlagCompletionFunc("format", fixedCompletion("table", "csv", "tsv", "json", "porcelain"))
+	RootCmd.RegisterFlagCompletionFunc("format", completeFormat)
 
 	RootCmd.SetUsageTemplate(customRootUsage)
 
@@ -84,6 +84,7 @@ var RootCmd = &cobra.Command{
 	RunE: func(c *cobra.Command, args []string) error {
 		if versionGlobalFlag {
 			if err := checkFormat(c); err != nil {
+				c.SilenceUsage = true
 				return err
 			}
 			printVersion(c, args)

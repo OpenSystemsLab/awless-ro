@@ -86,7 +86,13 @@ func mfaTokenCode() (string, error) {
 }
 
 func askMFATokenCode(t terminal) (string, error) {
-	return t.readLine("Assume Role MFA token code: ")
+	code, err := t.readLine("Assume Role MFA token code: ")
+	if err == nil && code == "" {
+		// Refused here, as fmt.Scanln did in the provider this replaces, rather
+		// than sent to STS to be refused there.
+		return "", errors.New("no MFA token code entered")
+	}
+	return code, err
 }
 
 func (t *stdTerminal) isInteractive() bool { return term.IsTerminal(int(t.in.Fd())) }

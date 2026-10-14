@@ -788,16 +788,26 @@ func (d *multiResourcesJSONDisplayer) Print(w io.Writer) error {
 		if err != nil {
 			return err
 		}
+		if len(resources) == 0 {
+			continue
+		}
 		// In id order, as for a single type, so that two runs over the same graph
 		// print the same thing.
 		sort.Slice(resources, func(i, j int) bool { return resources[i].Id() < resources[j].Id() })
+		// --ids: the ids of each type, keyed the same way.
+		if d.idsOnly {
+			ids := make([]string, 0, len(resources))
+			for _, res := range resources {
+				ids = append(ids, res.Id())
+			}
+			all[cloud.PluralizeResource(t)] = ids
+			continue
+		}
 		var props []map[string]interface{}
 		for _, res := range resources {
 			props = append(props, JSONProperties(res))
 		}
-		if len(resources) > 0 {
-			all[cloud.PluralizeResource(t)] = props
-		}
+		all[cloud.PluralizeResource(t)] = props
 	}
 
 	enc := json.NewEncoder(w)

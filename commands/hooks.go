@@ -58,6 +58,9 @@ func applyHooks(funcs ...func(*cobra.Command, []string) error) func(*cobra.Comma
 // applyHooks, it checks --format first.
 func chainHooks(funcs ...func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
+		// As in applyHooks: the command line parsed, so a failure from here on is not
+		// one the flag list helps with.
+		cmd.SilenceUsage = true
 		if err := checkFormat(cmd); err != nil {
 			return err
 		}

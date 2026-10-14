@@ -45,13 +45,7 @@ const formatsAnnotation = "formats"
 // another: a program asking for JSON and receiving a table fails somewhere far less
 // obvious.
 func checkFormat(cmd *cobra.Command) error {
-	allowed := []string{"table", "json"}
-	for c := cmd; c != nil; c = c.Parent() {
-		if formats, ok := c.Annotations[formatsAnnotation]; ok {
-			allowed = strings.Split(formats, ",")
-			break
-		}
-	}
+	allowed := formatsOf(cmd)
 	for _, f := range allowed {
 		if f == "any" || f == formatGlobalFlag {
 			return nil
@@ -62,4 +56,24 @@ func checkFormat(cmd *cobra.Command) error {
 		quoted[i] = "--format " + f
 	}
 	return fmt.Errorf("%s cannot print --format %s: use %s", cmd.CommandPath(), formatGlobalFlag, strings.Join(quoted, " or "))
+}
+
+// formatsOf is the --format values cmd takes, from its annotation or its parent's.
+func formatsOf(cmd *cobra.Command) []string {
+	for c := cmd; c != nil; c = c.Parent() {
+		if formats, ok := c.Annotations[formatsAnnotation]; ok {
+			return strings.Split(formats, ",")
+		}
+	}
+	return []string{"table", "json"}
+}
+
+// completeFormat offers the formats the command being completed takes, so that
+// completion does not suggest one checkFormat would then refuse.
+func completeFormat(cmd *cobra.Command, args []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
+	formats := formatsOf(cmd)
+	if len(formats) == 1 && formats[0] == "any" {
+		formats = []string{"table", "csv", "tsv", "json", "porcelain"}
+	}
+	return completeWith(formats, toComplete)
 }

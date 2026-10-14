@@ -69,6 +69,7 @@ func TestListJSONGolden(t *testing.T) {
 		{"list-instances-empty", func(*testing.T) *graph.Graph { return graph.NewGraph() }, []optsFn{WithRdfType("instance")}},
 		{"list-service", jsonGraph, nil},
 		{"list-service-empty", func(*testing.T) *graph.Graph { return graph.NewGraph() }, nil},
+		{"list-service-ids", jsonGraph, []optsFn{WithIDsOnly(true)}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

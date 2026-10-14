@@ -476,3 +476,11 @@ func TestMFATokenPromptIsNotOnStdout(t *testing.T) {
 		t.Errorf("the prompt was not written to the terminal's output: %q", prompts.String())
 	}
 }
+
+// An empty code is refused here rather than sent to STS.
+func TestMFATokenCodeMustNotBeEmpty(t *testing.T) {
+	term := &stdTerminal{out: &bytes.Buffer{}, r: bufio.NewReader(strings.NewReader("\n"))}
+	if _, err := askMFATokenCode(term); err == nil {
+		t.Fatal("an empty MFA code was accepted")
+	}
+}

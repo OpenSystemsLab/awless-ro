@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/theazz/awless-ro/graph"
 	"github.com/theazz/awless-ro/graph/resourcetest"
 	"github.com/theazz/awless-ro/internal/golden"
+	"github.com/theazz/awless-ro/sync"
 )
 
 func assertJSONGolden(t *testing.T, name string, v interface{}) {
@@ -90,7 +92,7 @@ func TestSyncJSONGolden(t *testing.T) {
 		t.Fatal(err)
 	}
 	stats := syncStats("storage", g)
-	assertJSONGolden(t, "sync", syncOutput{Profile: "default", Region: "eu-west-1", Services: []syncedService{stats}})
+	assertJSONGolden(t, "sync", syncOutput{Profile: "default", Region: "eu-west-1", Services: []syncedService{stats}, Errors: []string{}})
 
 	// The stderr line names what is off rather than counting it as zero.
 	if got, want := stats.String(), "storage: 2 buckets, s3objects: off (aws.storage.s3object.sync)"; got != want {
@@ -161,4 +163,54 @@ func TestEveryCommandRunsAHookThatChecksTheFormat(t *testing.T) {
 		t.Errorf("%s runs no hook, so its --format is never checked", c.CommandPath())
 	}
 	check(RootCmd)
+}
+
+// A service that could not be read is named, with the reason, rather than counted as
+// an account holding nothing.
+func TestSyncJSONWithAFailedService(t *testing.T) {
+	withConfig(t, map[string]interface{}{"aws.storage.s3object.sync": false}, map[string]interface{}{})
+
+	failed, other := splitSyncErrors(sync.Errors{
+		&sync.ServiceError{Service: "access", Err: errors.New("AccessDenied: not authorized to perform iam:ListUsers")},
+		errors.New("creating /nope: permission denied"),
+	})
+	if want := map[string]string{"access": "AccessDenied: not authorized to perform iam:ListUsers"}; len(failed) != 1 || failed["access"] != want["access"] {
+		t.Fatalf("failed services: got %v, want %v", failed, want)
+	}
+	if len(other) != 1 || !strings.Contains(other[0], "/nope") {
+		t.Fatalf("other errors: got %v", other)
+	}
+
+	access := syncStats("access", graph.NewGraph())
+	access.Error = failed["access"]
+	assertJSONGolden(t, "sync-failed-service", syncOutput{Profile: "default", Region: "eu-west-1", Services: []syncedService{access}, Errors: other})
+
+	if f, o := splitSyncErrors(nil); len(f) != 0 || o == nil || len(o) != 0 {
+		t.Errorf("no error: got %v and %#v, want nothing and an empty list", f, o)
+	}
+}
+
+func TestFormatCompletionOffersWhatTheCommandTakes(t *testing.T) {
+	listInstances, _, err := RootCmd.Find([]string{"list", "instances"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		cmd  *cobra.Command
+		want string
+	}{
+		{whoamiCmd, "table json"},
+		{sshCmd, "table"},
+		{listInstances, "table csv tsv json porcelain"},
+	}
+	for _, c := range cases {
+		got, _ := completeFormat(c.cmd, nil, "")
+		var names []string
+		for _, g := range got {
+			names = append(names, strings.SplitN(string(g), "\t", 2)[0])
+		}
+		if strings.Join(names, " ") != c.want {
+			t.Errorf("%s: got %v, want %s", c.cmd.CommandPath(), names, c.want)
+		}
+	}
 }

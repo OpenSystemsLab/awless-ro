@@ -460,22 +460,23 @@ such as `whoami --format csv`, refuses before doing anything; `list` alone also 
 | Command | Prints |
 |---|---|
 | `list <type>` | an array of resources, each an object of its properties; `--ids` makes it an array of ids |
-| `list <service>` | an object of arrays, keyed by resource type (`"instances"`) |
+| `list <service>` | an object of arrays, keyed by resource type (`"instances"`); with `--ids`, arrays of ids |
 | `show` | `{"type", "properties", "parents", "children", "appliedOn", "dependingOn"}`, plus `"siblings"` with `--siblings`; `--values-for` gives an object of the properties asked for |
 | `whoami` | `{"account", "arn", "userId", "resource", "resourceType", "resourcePath", "root", "policies"}`; `policies` only for an IAM user whose policies could be read; `--*-only` gives a one-key object |
 | `inspect` | an array of rows, one object per bucket or security group |
 | `tail` | one object per event, one per line (newline-delimited JSON), oldest first, so `--follow` streams |
 | `config` | an object of every key and its value; `--keys` an array; `get`, `set`, `unset` give `{"key", "value"}` |
 | `switch` | `{"profile", "region"}` |
-| `sync` | `{"profile", "region", "services"}`, the count of each resource type synced and the types left off |
+| `sync` | `{"profile", "region", "services", "errors"}`: per service the count of each resource type, the types left off, and an `"error"` when it could not be read in full; exits 1 when nothing could be synced |
 | `version` | `{"version", "commit", "buildDate", "os", "arch", "buildFor"}`, the build fields only when set |
 | `search images` | an array of images, as without `--format` (it has always printed JSON); `--latest-id` gives `{"id"}` |
 
 A resource is the same object from `list` and from `show` (under `"properties"`):
 property names as in `--columns`, numbers as numbers, dates in RFC 3339, CIDR blocks
 as text. Related resources are references, `{"id", "type", "name"}`; ask `show` for
-any of them. No result is `[]` or `{}`, never `null`, and the same graph prints the
-same bytes on every run.
+any of them. A command with no results prints `[]` or `{}`, never `null` (inside a
+firewall rule or a route, an absent list is still `null`, as it has been since
+v0.3.0), and the same graph prints the same bytes on every run.
 
 ```sh
 awless-ro list instances --format json | jq -r '.[] | select(.State == "running") | .ID'

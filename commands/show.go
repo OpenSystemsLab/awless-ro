@@ -107,12 +107,15 @@ var showCmd = &cobra.Command{
 			resource, gph = findResourceInLocalGraphs(ref)
 		}
 
-		if resource != nil {
-			if len(showPropertiesValuesOnlyFlag) > 0 {
-				showResourceValuesOnlyFor(resource, showPropertiesValuesOnlyFlag)
-			} else {
-				showResource(resource, gph)
-			}
+		// Gone after the refresh (deleted meanwhile): said, rather than an exit 0
+		// with nothing printed.
+		if resource == nil {
+			exitOn(decorateWithSuggestion(notFound, ref))
+		}
+		if len(showPropertiesValuesOnlyFlag) > 0 {
+			showResourceValuesOnlyFor(resource, showPropertiesValuesOnlyFlag)
+		} else {
+			showResource(resource, gph)
 		}
 
 		return nil

@@ -17,6 +17,7 @@ limitations under the License.
 package commands
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -30,6 +31,7 @@ import (
 	"github.com/theazz/awless-ro/aws/services"
 	"github.com/theazz/awless-ro/cloud"
 	"github.com/theazz/awless-ro/config"
+	"github.com/theazz/awless-ro/graph"
 	"github.com/theazz/awless-ro/logger"
 	"github.com/theazz/awless-ro/sync"
 )
@@ -84,15 +86,33 @@ var syncCmd = &cobra.Command{
 		} else {
 			syncFn()
 		}
-		if syncErr != nil {
-			logger.Verbose(syncErr)
-		}
+		failed, otherErrs := splitSyncErrors(syncErr)
 
-		out := syncOutput{Profile: config.GetAWSProfile(), Region: config.GetAWSRegion(), Services: []syncedService{}}
+		out := syncOutput{Profile: config.GetAWSProfile(), Region: config.GetAWSRegion(), Services: []syncedService{}, Errors: otherErrs}
+		// A failed service may have no graph at all; it is listed all the same.
+		if graphs == nil {
+			graphs = map[string]cloud.GraphAPI{}
+		}
+		for k := range failed {
+			if _, ok := graphs[k]; !ok {
+				graphs[k] = graph.NewGraph()
+			}
+		}
 		for k, g := range graphs {
 			stats := syncStats(k, g)
+			stats.Error = failed[k]
 			out.Services = append(out.Services, stats)
+			if stats.Error != "" {
+				// The README promises a service that could not be read is reported.
+				// It used to be said only with -v, so expired credentials looked like
+				// an empty account.
+				logger.Warningf("-> %s: not synced, or only in part: %s", k, stats.Error)
+				continue
+			}
 			logger.Infof("-> %s", stats)
+		}
+		for _, e := range otherErrs {
+			logger.Warning(e)
 		}
 		logger.Infof("sync took %s", time.Since(start))
 
@@ -100,8 +120,35 @@ var syncCmd = &cobra.Command{
 			sort.Slice(out.Services, func(i, j int) bool { return out.Services[i].Name < out.Services[j].Name })
 			printJSON(out)
 		}
+		// One service refused is an account with limited permissions, and the rest is
+		// still worth having; nothing synced at all is a failure.
+		if len(failed) > 0 && len(failed) == len(graphs) {
+			exitOn(errors.New("nothing could be synced"))
+		}
 		return nil
 	},
+}
+
+// splitSyncErrors sorts what Sync reported into the services that failed, by name,
+// and everything else.
+func splitSyncErrors(err error) (map[string]string, []string) {
+	failed, other := map[string]string{}, []string{}
+	var all sync.Errors
+	if !errors.As(err, &all) {
+		if err != nil {
+			other = append(other, err.Error())
+		}
+		return failed, other
+	}
+	for _, e := range all {
+		var se *sync.ServiceError
+		if errors.As(e, &se) {
+			failed[se.Service] = se.Err.Error()
+		} else {
+			other = append(other, e.Error())
+		}
+	}
+	return failed, other
 }
 
 // syncOutput is `sync --format json`: what was synced, per service. The progress and
@@ -110,6 +157,9 @@ type syncOutput struct {
 	Profile  string          `json:"profile"`
 	Region   string          `json:"region"`
 	Services []syncedService `json:"services"`
+	// Failures not tied to one service, such as a local file that could not be
+	// written.
+	Errors []string `json:"errors"`
 }
 
 type syncedService struct {
@@ -119,6 +169,9 @@ type syncedService struct {
 	// The types configuration left out, with the key that did. They are not in
 	// Resources: a count of zero would say the account has none.
 	Off map[string]string `json:"off"`
+	// Why the service could not be fetched, or not all of it. Its counts are then
+	// what was read, not what the account holds.
+	Error string `json:"error,omitempty"`
 }
 
 // String is the line sync logs for the service, in type order.
