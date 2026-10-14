@@ -134,9 +134,13 @@ func showResourceValuesOnlyFor(resource cloud.Resource, propKeys []string) {
 		}
 		return false, ""
 	}
-	for k, v := range resource.Properties() {
+	// In JSON the values keep their types and the keys their property names, so that
+	// a date is a date and a list a list rather than their printed forms.
+	jsonValues := map[string]interface{}{}
+	for k, v := range console.JSONProperties(resource) {
 		if ok, p := isIncluded(k); ok {
 			valuesForKeys[p] = fmt.Sprint(v)
+			jsonValues[k] = v
 		}
 	}
 
@@ -147,7 +151,9 @@ func showResourceValuesOnlyFor(resource cloud.Resource, propKeys []string) {
 		}
 	}
 
-	if len(values) > 0 {
+	if len(values) > 0 && jsonOutput() {
+		printJSON(jsonValues)
+	} else if len(values) > 0 {
 		fmt.Println(strings.Join(values, ","))
 	} else {
 		exitOn(fmt.Errorf("no values for %q", propKeys))
@@ -155,9 +161,16 @@ func showResourceValuesOnlyFor(resource cloud.Resource, propKeys []string) {
 }
 
 func showResource(resource cloud.Resource, gph cloud.GraphAPI) {
+	if jsonOutput() {
+		out, err := buildShowOutput(resource, gph, listAllSiblingsFlag)
+		exitOn(err)
+		printJSON(out)
+		return
+	}
+
 	displayer, err := console.BuildOptions(
 		console.WithColumnDefinitions(console.DefaultsColumnDefinitions[resource.Type()]),
-		console.WithFormat(listingFormat),
+		console.WithFormat(formatGlobalFlag),
 		console.WithMaxWidth(tableMaxWidth()),
 	).SetSource(resource).Build()
 	exitOn(err)
@@ -269,6 +282,11 @@ func findResourceInLocalGraphs(ref string) (cloud.Resource, cloud.GraphAPI) {
 			logger.Info(buf.String())
 		}
 
+		// Exiting 0 with nothing on stdout would hand a program reading JSON an
+		// empty document; it gets a failure it can act on instead.
+		if jsonOutput() {
+			exitOn(fmt.Errorf("'%s' names %d resources: show one of them by id", deprefix(ref), len(resources)))
+		}
 		os.Exit(0)
 	}
 

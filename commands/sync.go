@@ -22,6 +22,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/pprof"
+	"sort"
 	"strings"
 	"time"
 
@@ -87,13 +88,63 @@ var syncCmd = &cobra.Command{
 			logger.Verbose(syncErr)
 		}
 
+		out := syncOutput{Profile: config.GetAWSProfile(), Region: config.GetAWSRegion(), Services: []syncedService{}}
 		for k, g := range graphs {
-			displaySyncStats(k, g)
+			stats := syncStats(k, g)
+			out.Services = append(out.Services, stats)
+			logger.Infof("-> %s", stats)
 		}
 		logger.Infof("sync took %s", time.Since(start))
 
+		if jsonOutput() {
+			sort.Slice(out.Services, func(i, j int) bool { return out.Services[i].Name < out.Services[j].Name })
+			printJSON(out)
+		}
 		return nil
 	},
+}
+
+// syncOutput is `sync --format json`: what was synced, per service. The progress and
+// the timing stay on stderr, as in text.
+type syncOutput struct {
+	Profile  string          `json:"profile"`
+	Region   string          `json:"region"`
+	Services []syncedService `json:"services"`
+}
+
+type syncedService struct {
+	Name string `json:"name"`
+	// The number of resources of each type, by type name (as in show's "type").
+	Resources map[string]int `json:"resources"`
+	// The types configuration left out, with the key that did. They are not in
+	// Resources: a count of zero would say the account has none.
+	Off map[string]string `json:"off"`
+}
+
+// String is the line sync logs for the service, in type order.
+func (s syncedService) String() string {
+	types := make([]string, 0, len(s.Resources)+len(s.Off))
+	for rt := range s.Resources {
+		types = append(types, rt)
+	}
+	for rt := range s.Off {
+		types = append(types, rt)
+	}
+	sort.Strings(types)
+
+	strs := make([]string, 0, len(types))
+	for _, rt := range types {
+		if key, off := s.Off[rt]; off {
+			strs = append(strs, fmt.Sprintf("%s: off (%s)", cloud.PluralizeResource(rt), key))
+			continue
+		}
+		n := s.Resources[rt]
+		if n > 1 {
+			rt = cloud.PluralizeResource(rt)
+		}
+		strs = append(strs, fmt.Sprintf("%d %s", n, rt))
+	}
+	return fmt.Sprintf("%s: %s", s.Name, strings.Join(strs, ", "))
 }
 
 func withProfiling(fn func()) {
@@ -123,8 +174,8 @@ func withProfiling(fn func()) {
 	logger.Infof("Generated profiling files %s and %s", cpu.Name(), mem.Name())
 }
 
-func displaySyncStats(serviceName string, g cloud.GraphAPI) {
-	var strs []string
+func syncStats(serviceName string, g cloud.GraphAPI) syncedService {
+	stats := syncedService{Name: serviceName, Resources: map[string]int{}, Off: map[string]string{}}
 	for rt, service := range awsservices.ServicePerResourceType {
 		if service != serviceName {
 			continue
@@ -136,7 +187,7 @@ func displaySyncStats(serviceName string, g cloud.GraphAPI) {
 		// parent — one per hosted zone, one per bucket — so this is the common case,
 		// not an edge one.
 		if key, off := syncDisabledFor(serviceName, rt); off {
-			strs = append(strs, fmt.Sprintf("%s: off (%s)", cloud.PluralizeResource(rt), key))
+			stats.Off[rt] = key
 			continue
 		}
 
@@ -144,14 +195,9 @@ func displaySyncStats(serviceName string, g cloud.GraphAPI) {
 		if err != nil {
 			continue
 		}
-		nbRes := len(res)
-		if nbRes > 1 {
-			strs = append(strs, fmt.Sprintf("%d %s", nbRes, cloud.PluralizeResource(rt)))
-		} else {
-			strs = append(strs, fmt.Sprintf("%d %s", nbRes, rt))
-		}
+		stats.Resources[rt] = len(res)
 	}
-	logger.Infof("-> %s: %s", serviceName, strings.Join(strs, ", "))
+	return stats
 }
 
 // syncDisabledFor reports whether a resource type was skipped by configuration, and
