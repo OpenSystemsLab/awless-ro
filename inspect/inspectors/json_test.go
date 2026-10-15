@@ -87,6 +87,26 @@ func TestOpenBucketsRowsGolden(t *testing.T) {
 	}
 }
 
+// Only ACL grants are read. An empty answer says nothing about bucket policies or
+// Block Public Access, which is how buckets are opened nowadays, so the notes say so
+// whatever the rows hold.
+func TestOpenBucketsNotesSayWhatWasChecked(t *testing.T) {
+	open := &OpenBuckets{}
+	if err := open.Inspect(graph.NewGraph()); err != nil {
+		t.Fatal(err)
+	}
+	var notes bytes.Buffer
+	open.Rows(&notes)
+	if !strings.Contains(notes.String(), "ACL") || !strings.Contains(notes.String(), "Bucket policies") {
+		t.Errorf("notes should say only ACLs were checked, got %q", notes.String())
+	}
+	var text bytes.Buffer
+	open.Print(&text)
+	if !strings.Contains(text.String(), "Bucket policies") {
+		t.Errorf("text output should say only ACLs were checked, got %q", text.String())
+	}
+}
+
 func TestPortScannerRowsGolden(t *testing.T) {
 	_, all, _ := net.ParseCIDR("0.0.0.0/0")
 	g := graph.NewGraph()

@@ -63,3 +63,32 @@ func writeGraph(t *testing.T, home, profile, regionDir, service string) {
 		t.Fatal(err)
 	}
 }
+
+// A profile synced in one region has global files everywhere, so NothingSyncedFor is no
+// answer to "was this region's infra synced"; ServiceSyncedFor is.
+func TestServiceSyncedFor(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("__AWLESS_HOME", home)
+	const profile = "admin"
+
+	writeGraph(t, home, profile, "global", "access")
+	writeGraph(t, home, profile, "us-west-2", "infra")
+
+	for _, c := range []struct {
+		service, region string
+		want            bool
+	}{
+		{"infra", "us-west-2", true},
+		{"infra", "eu-west-1", false},
+		{"storage", "us-west-2", false},
+		{"access", "eu-west-1", true}, // global, whatever the region
+		{"dns", "us-west-2", false},
+	} {
+		if got := ServiceSyncedFor(c.service, profile, c.region); got != c.want {
+			t.Errorf("ServiceSyncedFor(%s, %s) = %v, want %v", c.service, c.region, got, c.want)
+		}
+	}
+	if NothingSyncedFor(profile, "eu-west-1") {
+		t.Error("precondition: the global file counts as something synced")
+	}
+}

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `list --local` says when the service it reads was never synced in that region, also
+  when another region of the profile was. A sync of us-west-2 left the global files
+  behind, and `list instances --local -r eu-west-1` answered an empty list.
+- With `--format json`, the "not synced" hint is a plain line on stderr, like the
+  inspectors' notes, instead of an `[info]` log line.
+- `inspect -i open_buckets` says that it reads bucket ACLs only, not bucket policies
+  or Block Public Access, so an empty answer no longer reads as "no public buckets".
+
 ## v0.6.0
 
 ### Added

@@ -113,8 +113,8 @@ var listSpecificResourceCmd = func(resType string) *cobra.Command {
 			var g cloud.GraphAPI
 
 			if localGlobalFlag {
-				warnIfNothingSynced()
 				if srvName, ok := awsservices.ServicePerResourceType[resType]; ok {
+					warnIfNotSynced(srvName)
 					var err error
 					g, err = sync.LoadLocalGraphForService(srvName, config.GetAWSProfile(), config.GetAWSRegion())
 					exitOn(err)
@@ -142,6 +142,7 @@ var listAllResourceInServiceCmd = func(srvName string) *cobra.Command {
 		Hidden:            true,
 
 		Run: func(cmd *cobra.Command, args []string) {
+			warnIfNotSynced(srvName)
 			g, err := sync.LoadLocalGraphForService(srvName, config.GetAWSProfile(), config.GetAWSRegion())
 			exitOn(err)
 			displayer, err := console.BuildOptions(
@@ -161,16 +162,32 @@ var listAllResourceInServiceCmd = func(srvName string) *cobra.Command {
 	}
 }
 
-// warnIfNothingSynced says so when --local is asked to read a local copy that does
-// not exist yet, instead of letting the command answer "No results found." — which
-// says something about the account, in a situation where the account was never read.
-func warnIfNothingSynced() {
+// warnIfNotSynced says so when --local is asked to read a local copy that does not
+// exist yet, instead of letting the command answer "No results found." — which says
+// something about the account, in a situation where the account was never read. The
+// copy is per service and region: a sync of another region leaves the global files
+// behind, which are no answer for this region's instances. In JSON the hint is a note,
+// a plain stderr line like the inspectors' notes, so that a caller who keeps the logs
+// out of the result still gets it.
+func warnIfNotSynced(service string) {
 	profile, region := config.GetAWSProfile(), config.GetAWSRegion()
-	if !sync.NothingSyncedFor(profile, region) {
+	var msg string
+	switch {
+	case sync.NothingSyncedFor(profile, region):
+		msg = fmt.Sprintf("nothing has been synced for profile '%s' in region '%s' yet, so --local has "+
+			"nothing to read. Run `awless-ro sync`, or drop --local to ask AWS directly.", profile, region)
+	case !sync.ServiceSyncedFor(service, profile, region):
+		msg = fmt.Sprintf("'%s' has not been synced for profile '%s' in region '%s' yet, so --local has "+
+			"nothing to read for it. Run `awless-ro sync --%s`, or drop --local to ask AWS directly.",
+			service, profile, region, service)
+	default:
 		return
 	}
-	logger.Infof("nothing has been synced for profile '%s' in region '%s' yet, so --local has "+
-		"nothing to read. Run `awless-ro sync`, or drop --local to ask AWS directly.", profile, region)
+	if jsonOutput() {
+		fmt.Fprintln(os.Stderr, msg)
+		return
+	}
+	logger.Info(msg)
 }
 
 func printResources(g cloud.GraphAPI, resType string) {
