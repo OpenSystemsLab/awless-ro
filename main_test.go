@@ -496,6 +496,49 @@ func TestLocalListNothingSynced(t *testing.T) {
 	}
 }
 
+// A region that was never synced, in a profile that was: the global access file from a
+// sync of another region must not pass for this region's infra. The listing used to
+// answer an empty list and nothing else.
+func TestLocalListServiceNotSyncedInRegion(t *testing.T) {
+	bin := build(t)
+	home := graphHome(t, map[string]string{
+		"global/access": "<pol-1> <cloud:id> \"pol-1\" .\n<pol-1> <rdf:type> <cloud-owl:Policy> .\n",
+	})
+
+	stdout, stderr, exit := runLocal(t, bin, home, "list", "instances", "--local")
+	if exit != 0 {
+		t.Errorf("exit = %d, want 0", exit)
+	}
+	if !strings.Contains(stdout+stderr, "'infra' has not been synced") {
+		t.Errorf("expected a hint that infra was not synced in this region, got stdout:\n%s\nstderr:\n%s", stdout, stderr)
+	}
+
+	// In JSON the hint is a note, a plain stderr line like the inspectors' notes, not a
+	// log line that a caller filtering logs out would drop.
+	stdout, stderr, exit = runLocal(t, bin, home, "list", "instances", "--local", "--format", "json")
+	if exit != 0 {
+		t.Errorf("json: exit = %d, want 0", exit)
+	}
+	if strings.TrimSpace(stdout) != "[]" {
+		t.Errorf("json: stdout = %q, want []", stdout)
+	}
+	var note string
+	for _, line := range strings.Split(stderr, "\n") {
+		if strings.Contains(line, "'infra' has not been synced") {
+			note = line
+		}
+	}
+	if note == "" || strings.HasPrefix(note, "[") {
+		t.Errorf("json: want a plain note on stderr, got:\n%s", stderr)
+	}
+
+	// The access file is there, so policies list without the hint.
+	_, stderr, _ = runLocal(t, bin, home, "list", "policies", "--local", "--format", "json")
+	if strings.Contains(stderr, "has not been synced") {
+		t.Errorf("policies were synced, yet: %s", stderr)
+	}
+}
+
 // Part 2 end to end: a 9 MiB document literal — far past the old scanner ceiling — loads
 // and lists. `list` does not render the document value itself, so this is the end-to-end
 // proof that the decoder now reads an arbitrarily large single line.

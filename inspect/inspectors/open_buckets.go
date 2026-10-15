@@ -81,7 +81,16 @@ type OpenBucket struct {
 	Grantee string `json:"grantee"`
 }
 
-func (a *OpenBuckets) Rows(io.Writer) interface{} {
+// aclOnly is what the inspector cannot see. It reads the grants in bucket ACLs, and
+// buckets are made public today through bucket policies, which it does not read, so an
+// empty answer must not pass for "no bucket is public".
+const aclOnly = "Only bucket ACL grants were checked. Bucket policies and S3 Block Public Access settings " +
+	"are not read, so a bucket made public by its policy is not listed here."
+
+func (a *OpenBuckets) Rows(notes io.Writer) interface{} {
+	if notes != nil {
+		fmt.Fprintln(notes, aclOnly)
+	}
 	rows := []OpenBucket{}
 	for _, b := range a.openToAny {
 		rows = append(rows, OpenBucket{Bucket: b, Grantee: "AllUsers"})
@@ -104,4 +113,5 @@ func (a *OpenBuckets) Print(w io.Writer) {
 	if len(a.openToAnyAuth) == 0 && len(a.openToAny) == 0 {
 		fmt.Fprintln(w, "none found")
 	}
+	fmt.Fprintln(w, aclOnly)
 }

@@ -216,7 +216,7 @@ func connectionGraph(local bool, infra infraFetcher, loadLocal func() (cloud.Gra
 // localInfraGraph reads the synced infra file, which holds the instances, their
 // security groups and the account's images.
 func localInfraGraph() (cloud.GraphAPI, error) {
-	warnIfNothingSynced()
+	warnIfNotSynced("infra")
 	return sync.LoadLocalGraphForService("infra", config.GetAWSProfile(), config.GetAWSRegion())
 }
 

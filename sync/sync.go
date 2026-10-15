@@ -202,12 +202,7 @@ func (e *ServiceError) Unwrap() error { return e.Err }
 // closed instead of presenting unread data as "No results found.". The returned
 // graph is always non-nil so a caller that ignores the error cannot nil-deref.
 func LoadLocalGraphForService(serviceName, profile, region string) (cloud.GraphAPI, error) {
-	regionDir := region
-	if serviceName == "access" || serviceName == "dns" || serviceName == "cdn" {
-		regionDir = "global"
-	}
-	path := filepath.Join(repo.BaseDir(), profile, regionDir, fmt.Sprintf("%s%s", serviceName, fileExt))
-	g, err := graph.NewGraphFromFiles(path)
+	g, err := graph.NewGraphFromFiles(localGraphPath(serviceName, profile, region))
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return graph.NewGraph(), nil
@@ -215,6 +210,22 @@ func LoadLocalGraphForService(serviceName, profile, region string) (cloud.GraphA
 		return g, err
 	}
 	return g, nil
+}
+
+// ServiceSyncedFor reports whether the service's file for this profile and region has
+// been synced. A profile synced in one region has its global files (access, dns, cdn)
+// for every region, so "something was synced" does not mean this region's infra was.
+func ServiceSyncedFor(serviceName, profile, region string) bool {
+	_, err := os.Stat(localGraphPath(serviceName, profile, region))
+	return err == nil
+}
+
+func localGraphPath(serviceName, profile, region string) string {
+	regionDir := region
+	if serviceName == "access" || serviceName == "dns" || serviceName == "cdn" {
+		regionDir = "global"
+	}
+	return filepath.Join(repo.BaseDir(), profile, regionDir, fmt.Sprintf("%s%s", serviceName, fileExt))
 }
 
 func LoadLocalGraphs(profile, region string) (cloud.GraphAPI, error) {
