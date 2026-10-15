@@ -18,6 +18,10 @@
   order in every format, instead of a different one on each read of the local graph.
 - The MFA code prompt, the first-run region prompt and `config set`'s value prompt
   are written to stderr.
+- `make build` builds for arm64 unless `GOARCH` says otherwise; `release.go` and the
+  README's install section list the arm64 archives first.
+- CI and the release workflow also run the tests and the binary on arm64, natively,
+  on GitHub's Linux arm64 and Apple Silicon runners.
 
 ### Fixed
 

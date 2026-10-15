@@ -78,3 +78,34 @@ jobs:
       # there is one less third party in the chain.
       - name: actionlint
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+
+  # The same code on arm64, natively: release.go publishes darwin/arm64 and
+  # linux/arm64 binaries, and they are cross-compiled on amd64, so without this job
+  # neither the tests nor the binary would ever run on arm64. GitHub-hosted, free for
+  # public repositories: ubuntu-24.04-arm is Linux on arm64, macos-latest Apple
+  # Silicon. Only what depends on the architecture runs here; the other gates are
+  # the same everywhere and run once, in build.
+  arm64:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04-arm, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26'
+          check-latest: true
+
+      - name: go test
+        run: go test ./... -race
+
+      - name: run the binary
+        run: |
+          go build -trimpath -o awless-ro .
+          echo "built for $(go env GOOS)/$(go env GOARCH) on $(uname -sm)"
+          ./awless-ro version
+          ./awless-ro --help > /dev/null
