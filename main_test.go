@@ -540,21 +540,36 @@ func TestLocalListServiceNotSyncedInRegion(t *testing.T) {
 }
 
 // A sync keeps per-bucket totals, not the objects, so `list s3objects --local` has
-// none to show even when the buckets hold thousands. It says so and where to look
+// none to show even when the buckets hold thousands. It says why and where to look
 // instead, rather than answering an empty list.
-func TestLocalListObjectsSaysOnlyTotalsWereKept(t *testing.T) {
+func TestLocalListObjectsSaysWhyItIsEmpty(t *testing.T) {
 	bin := build(t)
-	home := graphHome(t, map[string]string{
-		"eu-west-1/storage": "<logs> <cloud:id> \"logs\" .\n<logs> <rdf:type> <cloud-owl:Bucket> .\n",
-	})
+	bucket := "<logs> <cloud:id> \"logs\" .\n<logs> <rdf:type> <cloud-owl:Bucket> .\n"
+	home := graphHome(t, map[string]string{"eu-west-1/storage": bucket})
 
-	stdout, stderr, exit := runLocal(t, bin, home, "list", "s3objects", "--local", "--format", "json")
-	if exit != 0 {
-		t.Errorf("exit = %d, want 0", exit)
+	listObjects := func() (string, string) {
+		t.Helper()
+		stdout, stderr, exit := runLocal(t, bin, home, "list", "s3objects", "--local", "--format", "json")
+		if exit != 0 {
+			t.Errorf("exit = %d, want 0", exit)
+		}
+		if strings.TrimSpace(stdout) != "[]" {
+			t.Errorf("stdout = %q, want []", stdout)
+		}
+		return stdout, stderr
 	}
-	if strings.TrimSpace(stdout) != "[]" {
-		t.Errorf("stdout = %q, want []", stdout)
+
+	// Object sync off, the default: that is the setting to name.
+	_, stderr := listObjects()
+	if !strings.Contains(stderr, "aws.storage.s3object.sync") {
+		t.Errorf("object sync is off, and the note does not say so:\n%s", stderr)
 	}
+
+	// On, without keep: only totals were kept.
+	if _, _, exit := runLocal(t, bin, home, "config", "set", "aws.storage.s3object.sync", "true"); exit != 0 {
+		t.Fatalf("config set failed")
+	}
+	_, stderr = listObjects()
 	for _, want := range []string{"bucket_sizer", "aws.storage.s3object.keep"} {
 		if !strings.Contains(stderr, want) {
 			t.Errorf("the note does not mention %s:\n%s", want, stderr)
@@ -563,8 +578,26 @@ func TestLocalListObjectsSaysOnlyTotalsWereKept(t *testing.T) {
 
 	// Buckets list without it.
 	_, stderr, _ = runLocal(t, bin, home, "list", "buckets", "--local", "--format", "json")
-	if strings.Contains(stderr, "aws.storage.s3object.keep") {
+	if strings.Contains(stderr, "aws.storage.s3object") {
 		t.Errorf("listing buckets printed the objects note: %s", stderr)
+	}
+}
+
+// Objects in the graph, from keep or an earlier version: they list, with no note
+// explaining an empty answer.
+func TestLocalListObjectsKeptHasNoNote(t *testing.T) {
+	bin := build(t)
+	home := graphHome(t, map[string]string{
+		"eu-west-1/storage": "<logs> <cloud:id> \"logs\" .\n<logs> <rdf:type> <cloud-owl:Bucket> .\n" +
+			"<obj-1> <cloud:id> \"obj-1\" .\n<obj-1> <rdf:type> <cloud-owl:S3object> .\n",
+	})
+
+	stdout, stderr, _ := runLocal(t, bin, home, "list", "s3objects", "--local", "--format", "json")
+	if !strings.Contains(stdout, "obj-1") {
+		t.Errorf("the object does not list: %s", stdout)
+	}
+	if strings.Contains(stderr, "aws.storage.s3object") {
+		t.Errorf("a note explains an empty list that is not empty: %s", stderr)
 	}
 }
 

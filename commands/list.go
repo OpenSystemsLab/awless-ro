@@ -115,12 +115,12 @@ var listSpecificResourceCmd = func(resType string) *cobra.Command {
 			if localGlobalFlag {
 				if srvName, ok := awsservices.ServicePerResourceType[resType]; ok {
 					warnIfNotSynced(srvName)
-					if resType == cloud.S3Object {
-						noteObjectsNotKept()
-					}
 					var err error
 					g, err = sync.LoadLocalGraphForService(srvName, config.GetAWSProfile(), config.GetAWSRegion())
 					exitOn(err)
+					if resType == cloud.S3Object {
+						noteNoObjectsKept(g, srvName)
+					}
 				} else {
 					exitOn(fmt.Errorf("cannot find service for resource type %s", resType))
 				}
@@ -189,16 +189,32 @@ func warnIfNotSynced(service string) {
 	printNote(msg)
 }
 
-// noteObjectsNotKept says why `list s3objects --local` is empty when the buckets are
-// not: a sync keeps a count and a size per bucket, not the objects themselves.
-func noteObjectsNotKept() {
-	v, _ := config.Get("aws.storage.s3object.keep")
-	if keep, _ := v.(bool); keep {
+// noteNoObjectsKept says why `list s3objects --local` is empty when the buckets are
+// not: object sync is off, or on and keeping a count and a size per bucket rather
+// than the objects. Nothing is said when objects are there to list, or when the
+// service was never synced, which warnIfNotSynced has said already.
+func noteNoObjectsKept(g cloud.GraphAPI, service string) {
+	if objects, err := g.Find(cloud.NewQuery(cloud.S3Object)); err != nil || len(objects) > 0 {
 		return
 	}
-	printNote("a sync keeps the number and total size of the objects in each bucket, not the objects: " +
-		"see `awless-ro inspect -i bucket_sizer`. Drop --local to list the objects from AWS, or keep " +
-		"them from the next sync on with `awless-ro config set aws.storage.s3object.keep true`.")
+	if !sync.ServiceSyncedFor(service, config.GetAWSProfile(), config.GetAWSRegion()) {
+		return
+	}
+	isOn := func(key string) bool {
+		v, _ := config.Get(key)
+		on, _ := v.(bool)
+		return on
+	}
+	switch {
+	case !isOn("aws.storage.s3object.sync"):
+		printNote("S3 objects are not synced: aws.storage.s3object.sync is off. Drop --local to list them " +
+			"from AWS, or turn object sync on with `awless-ro config set aws.storage.s3object.sync true` " +
+			"and `awless-ro config set aws.storage.s3object.keep true`.")
+	case !isOn("aws.storage.s3object.keep"):
+		printNote("a sync keeps the number and total size of the objects in each bucket, not the objects: " +
+			"see `awless-ro inspect -i bucket_sizer`. Drop --local to list the objects from AWS, or keep " +
+			"them from the next sync on with `awless-ro config set aws.storage.s3object.keep true`.")
+	}
 }
 
 // printNote is logged, except in JSON, where it is a plain stderr line like the

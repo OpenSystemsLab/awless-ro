@@ -151,6 +151,50 @@ func TestBucketSizerSurvivesOddProperties(t *testing.T) {
 	}
 }
 
+// A bucket whose listing failed, or never ran because an earlier one failed, has no
+// count. Left out silently, the total would read as the account's.
+func TestBucketSizerSaysWhichBucketsWereNotSized(t *testing.T) {
+	g := graph.NewGraph()
+	g.AddResource(
+		sized("logs", 2, 2_000_000_000),
+		resourcetest.Bucket("denied").Build(),
+	)
+
+	sizer := &BucketSizer{}
+	if err := sizer.Inspect(g); err != nil {
+		t.Fatal(err)
+	}
+	var out, notes bytes.Buffer
+	sizer.Print(&out)
+	sizer.Rows(&notes)
+
+	for name, got := range map[string]string{"text": out.String(), "notes": notes.String()} {
+		if !strings.Contains(got, "1 bucket(s) have no size") {
+			t.Errorf("%s: the unsized bucket is not reported:\n%s", name, got)
+		}
+	}
+}
+
+// A graph synced by an earlier version holds the objects and no totals. Object sync is
+// on there, so "turn it on" would be the wrong advice.
+func TestBucketSizerOnAGraphFromAnEarlierVersion(t *testing.T) {
+	g := graph.NewGraph()
+	g.AddResource(
+		resourcetest.Bucket("logs").Build(),
+		resourcetest.S3Object("obj_1").Prop(properties.Bucket, "logs").Prop(properties.Size, 1).Build(),
+	)
+
+	sizer := &BucketSizer{}
+	if err := sizer.Inspect(g); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	sizer.Print(&out)
+	if got := out.String(); !strings.Contains(got, "sync --storage") || strings.Contains(got, "config set aws.storage.s3object.sync") {
+		t.Errorf("want advice to sync again, got:\n%s", got)
+	}
+}
+
 func sized(name string, objects, size int) *graph.Resource {
 	return resourcetest.Bucket(name).
 		Prop(properties.ObjectCount, objects).
