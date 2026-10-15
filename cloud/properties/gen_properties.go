@@ -147,6 +147,7 @@ const (
 	NewInstancesProtected             = "NewInstancesProtected"
 	Notifications                     = "Notifications"
 	OKActions                         = "OKActions"
+	ObjectCount                       = "ObjectCount"
 	OptionGroups                      = "OptionGroups"
 	Origins                           = "Origins"
 	OutboundRules                     = "OutboundRules"

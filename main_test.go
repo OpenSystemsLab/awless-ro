@@ -539,6 +539,35 @@ func TestLocalListServiceNotSyncedInRegion(t *testing.T) {
 	}
 }
 
+// A sync keeps per-bucket totals, not the objects, so `list s3objects --local` has
+// none to show even when the buckets hold thousands. It says so and where to look
+// instead, rather than answering an empty list.
+func TestLocalListObjectsSaysOnlyTotalsWereKept(t *testing.T) {
+	bin := build(t)
+	home := graphHome(t, map[string]string{
+		"eu-west-1/storage": "<logs> <cloud:id> \"logs\" .\n<logs> <rdf:type> <cloud-owl:Bucket> .\n",
+	})
+
+	stdout, stderr, exit := runLocal(t, bin, home, "list", "s3objects", "--local", "--format", "json")
+	if exit != 0 {
+		t.Errorf("exit = %d, want 0", exit)
+	}
+	if strings.TrimSpace(stdout) != "[]" {
+		t.Errorf("stdout = %q, want []", stdout)
+	}
+	for _, want := range []string{"bucket_sizer", "aws.storage.s3object.keep"} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("the note does not mention %s:\n%s", want, stderr)
+		}
+	}
+
+	// Buckets list without it.
+	_, stderr, _ = runLocal(t, bin, home, "list", "buckets", "--local", "--format", "json")
+	if strings.Contains(stderr, "aws.storage.s3object.keep") {
+		t.Errorf("listing buckets printed the objects note: %s", stderr)
+	}
+}
+
 // Part 2 end to end: a 9 MiB document literal — far past the old scanner ceiling — loads
 // and lists. `list` does not render the document value itself, so this is the end-to-end
 // proof that the decoder now reads an arbitrarily large single line.

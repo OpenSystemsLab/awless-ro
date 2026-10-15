@@ -30,6 +30,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/theazz/awless-ro/aws/services"
 	"github.com/theazz/awless-ro/cloud"
+	"github.com/theazz/awless-ro/cloud/properties"
 	"github.com/theazz/awless-ro/config"
 	"github.com/theazz/awless-ro/graph"
 	"github.com/theazz/awless-ro/logger"
@@ -244,6 +245,13 @@ func syncStats(serviceName string, g cloud.GraphAPI) syncedService {
 			continue
 		}
 
+		// A sync keeps a count per bucket rather than the objects, unless told to keep
+		// them, so the objects in the graph would count none of them.
+		if rt == cloud.S3Object {
+			stats.Resources[rt] = objectsCountedOnBuckets(g)
+			continue
+		}
+
 		res, err := g.Find(cloud.NewQuery(rt))
 		if err != nil {
 			continue
@@ -251,6 +259,19 @@ func syncStats(serviceName string, g cloud.GraphAPI) syncedService {
 		stats.Resources[rt] = len(res)
 	}
 	return stats
+}
+
+func objectsCountedOnBuckets(g cloud.GraphAPI) int {
+	buckets, err := g.Find(cloud.NewQuery(cloud.Bucket))
+	if err != nil {
+		return 0
+	}
+	var n int
+	for _, b := range buckets {
+		count, _ := b.Properties()[properties.ObjectCount].(int)
+		n += count
+	}
+	return n
 }
 
 // syncDisabledFor reports whether a resource type was skipped by configuration, and

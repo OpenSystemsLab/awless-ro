@@ -27,10 +27,9 @@ func rowsJSON(t *testing.T, rows interface{}) []byte {
 func TestBucketSizerRowsGolden(t *testing.T) {
 	g := graph.NewGraph()
 	g.AddResource(
-		object("a", "zebra", 1_500_000_000),
-		object("b", "alpha", 2),
-		object("c", "alpha", 3),
-		resourcetest.S3Object("orphan").Prop(properties.Size, 42).Build(),
+		sized("zebra", 1, 1_500_000_000),
+		sized("alpha", 2, 5),
+		resourcetest.Bucket("unsized").Build(),
 	)
 	sizer := &BucketSizer{}
 	if err := sizer.Inspect(g); err != nil {
@@ -38,9 +37,6 @@ func TestBucketSizerRowsGolden(t *testing.T) {
 	}
 	var notes bytes.Buffer
 	golden.Assert(t, "bucket_sizer", rowsJSON(t, sizer.Rows(&notes)))
-	if !strings.Contains(notes.String(), "named no bucket") {
-		t.Errorf("the object naming no bucket is not reported on the side:\n%s", notes.String())
-	}
 }
 
 // Nothing fetched is an empty array, with the reason on the side rather than in the

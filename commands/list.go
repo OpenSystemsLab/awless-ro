@@ -115,6 +115,9 @@ var listSpecificResourceCmd = func(resType string) *cobra.Command {
 			if localGlobalFlag {
 				if srvName, ok := awsservices.ServicePerResourceType[resType]; ok {
 					warnIfNotSynced(srvName)
+					if resType == cloud.S3Object {
+						noteObjectsNotKept()
+					}
 					var err error
 					g, err = sync.LoadLocalGraphForService(srvName, config.GetAWSProfile(), config.GetAWSRegion())
 					exitOn(err)
@@ -183,6 +186,25 @@ func warnIfNotSynced(service string) {
 	default:
 		return
 	}
+	printNote(msg)
+}
+
+// noteObjectsNotKept says why `list s3objects --local` is empty when the buckets are
+// not: a sync keeps a count and a size per bucket, not the objects themselves.
+func noteObjectsNotKept() {
+	v, _ := config.Get("aws.storage.s3object.keep")
+	if keep, _ := v.(bool); keep {
+		return
+	}
+	printNote("a sync keeps the number and total size of the objects in each bucket, not the objects: " +
+		"see `awless-ro inspect -i bucket_sizer`. Drop --local to list the objects from AWS, or keep " +
+		"them from the next sync on with `awless-ro config set aws.storage.s3object.keep true`.")
+}
+
+// printNote is logged, except in JSON, where it is a plain stderr line like the
+// inspectors' notes, so that a caller who keeps the logs out of the result still
+// gets it.
+func printNote(msg string) {
 	if jsonOutput() {
 		fmt.Fprintln(os.Stderr, msg)
 		return

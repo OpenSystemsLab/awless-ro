@@ -511,6 +511,13 @@ and skipped; the rest still land.
 Two resource types are off by default because they cost an API call per parent — one
 per bucket, one per hosted zone. The sync says so rather than reporting zero of them.
 
+With S3 object sync on, the sync keeps the number and total size of the objects in
+each bucket, which is what `inspect -i bucket_sizer` reads, and not the objects
+themselves, so memory stays flat however much the buckets hold. To keep every object
+too, for `list s3objects --local` on small buckets, set
+`aws.storage.s3object.keep true`. `list s3objects` without `--local` asks AWS
+directly either way.
+
 You rarely need to run it by hand. `show` and `inspect` refresh the copy on their own
 for the services they touch, and changing region with `switch` syncs the new one
 once. The first run does not sync. `--no-sync` skips that for one command, and

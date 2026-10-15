@@ -676,8 +676,13 @@ func addManualStorageFetchFuncs(conf *Config, funcs map[string]fetch.Func) {
 			}
 		}()
 
+		// A sync keeps per-bucket totals only, unless asked for the objects too.
+		// `list s3objects` fetches by type and prints the objects themselves.
+		fetchingType, _ := fetch.IsFetchingByType(ctx)
+		keepObjects := fetchingType == "s3object" || conf.getBool("aws.storage.s3object.keep")
+
 		err := forEachBucketParallel(ctx, cache, conf.APIs.S3, func(b s3types.Bucket) error {
-			return fetchObjectsForBucket(ctx, conf.APIs.S3, b, resourcesC)
+			return fetchObjectsForBucket(ctx, conf.APIs.S3, b, keepObjects, resourcesC)
 		})
 
 		close(resourcesC)

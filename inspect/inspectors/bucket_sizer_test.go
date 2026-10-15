@@ -33,12 +33,31 @@ func TestBucketSizerSaysNothingWasFetchedRatherThanZero(t *testing.T) {
 	}
 }
 
-func TestBucketSizerTotalsBySizeAndBucket(t *testing.T) {
+// Buckets synced with object sync off carry no totals: that is "never looked", not
+// "empty".
+func TestBucketSizerSaysNothingWasFetchedForBucketsWithoutTotals(t *testing.T) {
+	g := graph.NewGraph()
+	g.AddResource(resourcetest.Bucket("logs").Build())
+
+	var out bytes.Buffer
+	sizer := &BucketSizer{}
+	if err := sizer.Inspect(g); err != nil {
+		t.Fatal(err)
+	}
+	sizer.Print(&out)
+	if got := out.String(); !strings.Contains(got, "aws.storage.s3object.sync") || strings.Contains(got, "TOTAL") {
+		t.Errorf("a bucket that was never sized is reported as sized:\n%s", got)
+	}
+}
+
+// The sizes come from the totals a sync keeps on each bucket. Objects kept in the
+// graph as well (aws.storage.s3object.keep) are not counted a second time.
+func TestBucketSizerReadsTheTotalsOnEachBucket(t *testing.T) {
 	g := graph.NewGraph()
 	g.AddResource(
-		object("obj_1", "logs", 1_500_000_000),
-		object("obj_2", "logs", 500_000_000),
-		object("obj_3", "backups", 3_000_000_000),
+		sized("logs", 2, 2_000_000_000),
+		sized("backups", 1, 3_000_000_000),
+		resourcetest.S3Object("obj_1").Prop(properties.Bucket, "logs").Prop(properties.Size, 1_500_000_000).Build(),
 	)
 
 	var out bytes.Buffer
@@ -69,9 +88,9 @@ func TestBucketSizerTotalsBySizeAndBucket(t *testing.T) {
 func TestBucketSizerOutputIsOrdered(t *testing.T) {
 	g := graph.NewGraph()
 	g.AddResource(
-		object("a", "zebra", 1),
-		object("b", "alpha", 1),
-		object("c", "middle", 1),
+		sized("zebra", 1, 1),
+		sized("alpha", 1, 1),
+		sized("middle", 1, 1),
 	)
 
 	var first string
@@ -98,20 +117,18 @@ func TestBucketSizerOutputIsOrdered(t *testing.T) {
 	}
 }
 
-// The property reads used to be unchecked type assertions, so an object with no
-// Bucket, or a Size that did not arrive as an int, took the process down. An inspector
-// reports on whatever the account happens to contain.
+// The property reads are checked, not asserted: an inspector reports on whatever the
+// graph happens to hold, and an unchecked assertion took the process down.
 func TestBucketSizerSurvivesOddProperties(t *testing.T) {
 	g := graph.NewGraph()
 	g.AddResource(
-		object("good", "logs", 1_000_000_000),
-		// No bucket: counted apart rather than attributed or crashed on.
-		resourcetest.S3Object("orphan").Prop(properties.Size, 42).Build(),
-		// A size that is not an int.
-		resourcetest.S3Object("odd").Prop(properties.Bucket, "logs").
-			Prop(properties.Size, "not a number").Build(),
-		// No size at all.
-		resourcetest.S3Object("sizeless").Prop(properties.Bucket, "logs").Build(),
+		sized("logs", 3, 1_000_000_000),
+		// A size that is not an int: the objects count, the size does not.
+		resourcetest.Bucket("odd").Prop(properties.ObjectCount, 4).Prop(properties.Size, "not a number").Build(),
+		// A count that is not an int: not sized.
+		resourcetest.Bucket("odder").Prop(properties.ObjectCount, "many").Build(),
+		// No totals at all: never sized.
+		resourcetest.Bucket("unsized").Build(),
 	)
 
 	var out bytes.Buffer
@@ -120,27 +137,23 @@ func TestBucketSizerSurvivesOddProperties(t *testing.T) {
 		t.Fatal(err)
 	}
 	sizer.Print(&out)
-	got := out.String()
 
-	// The one good object still counts, and the sizeless ones count as objects
-	// without adding to the size.
-	if want := "1.000000 Gb"; !strings.Contains(got, want) {
-		t.Errorf("output is missing %q:\n%s", want, got)
+	if sizer.total != 1_000_000_000 {
+		t.Errorf("total is %d bytes, want 1000000000:\n%s", sizer.total, out.String())
 	}
-	if n := sizer.buckets["logs"].objects; n != 3 {
-		t.Errorf("logs holds %d objects, want 3", n)
+	if odd := sizer.buckets["odd"]; odd == nil || odd.objects != 4 {
+		t.Errorf("odd should hold 4 objects, got %+v", odd)
 	}
-	if sizer.unattributed != 1 {
-		t.Errorf("%d objects counted as naming no bucket, want 1", sizer.unattributed)
-	}
-	if !strings.Contains(got, "named no bucket") {
-		t.Errorf("the object naming no bucket is not reported:\n%s", got)
+	for _, name := range []string{"odder", "unsized"} {
+		if _, ok := sizer.buckets[name]; ok {
+			t.Errorf("%s has no count, yet has a row", name)
+		}
 	}
 }
 
-func object(id, bucket string, size int) *graph.Resource {
-	return resourcetest.S3Object(id).
-		Prop(properties.Bucket, bucket).
+func sized(name string, objects, size int) *graph.Resource {
+	return resourcetest.Bucket(name).
+		Prop(properties.ObjectCount, objects).
 		Prop(properties.Size, size).
 		Build()
 }
