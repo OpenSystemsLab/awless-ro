@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.6.2
 
 ### Changed
 
@@ -10,6 +10,8 @@
   and an account with a few busy buckets took a 512 MiB container to its limit in
   seconds. `inspect -i bucket_sizer` reads the totals, and the sync line counts the
   objects from them. (OpenSystemsLab/awless-ro#4)
+- `inspect -i bucket_sizer` says how many buckets have no size, when a listing failed,
+  so the total is not read as the account's.
 
 ### Added
 
