@@ -45,6 +45,10 @@ var configDefinitions = map[string]*Definition{
 	// and why, since the cost is what makes it off: a call per bucket, a call per
 	// hosted zone, a call per metric.
 	"aws.storage.s3object.sync": {help: "Sync S3 objects: off by default, one API call per bucket", defaultValue: "false", parseParamFn: parseBool},
+	// What the object sync keeps by default is a count and a size per bucket, which is
+	// all bucket_sizer reads. Keeping every object makes memory grow with the number
+	// of objects in the account.
+	"aws.storage.s3object.keep": {help: "Keep each S3 object in the local graph, not just per-bucket totals: off by default, memory grows with the object count", defaultValue: "false", parseParamFn: parseBool},
 	"aws.dns.sync":              {help: "Enable/disable sync of DNS service (when empty: true)", defaultValue: "true", parseParamFn: parseBool},
 	"aws.dns.record.sync":       {help: "Sync DNS records: off by default, one API call per hosted zone", defaultValue: "false", parseParamFn: parseBool},
 	"aws.notification.sync":     {help: "Enable/disable sync of SNS service (when empty: true)", defaultValue: "true", parseParamFn: parseBool},

@@ -12,6 +12,7 @@
  "aws.notification.sync": null,
  "aws.profile": "default",
  "aws.region": "eu-west-1",
+ "aws.storage.s3object.keep": null,
  "aws.storage.s3object.sync": false,
  "aws.storage.sync": null,
  "region": "us-east-1"

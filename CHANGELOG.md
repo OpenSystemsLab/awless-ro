@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- S3 object sync keeps a count and a total size per bucket instead of every object,
+  so its memory no longer grows with the number of objects in the account. It used
+  to hold them all until the end of the sync, plus a copy of the bucket per object,
+  and an account with a few busy buckets took a 512 MiB container to its limit in
+  seconds. `inspect -i bucket_sizer` reads the totals, and the sync line counts the
+  objects from them. (OpenSystemsLab/awless-ro#4)
+
+### Added
+
+- `aws.storage.s3object.keep` (off by default) keeps every object in the local graph
+  as before, for `list s3objects --local`. Without it, `list s3objects --local` says
+  where the sizes are and how to list the objects.
+
 ## v0.6.1
 
 ### Fixed

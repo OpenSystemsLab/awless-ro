@@ -100,6 +100,27 @@ func TestSyncJSONGolden(t *testing.T) {
 	}
 }
 
+// A sync keeps per-bucket totals rather than the objects, so counting object
+// resources would print "0 s3object" for buckets holding thousands.
+func TestSyncCountsObjectsFromBucketTotals(t *testing.T) {
+	withConfig(t, map[string]interface{}{"aws.storage.s3object.sync": true}, map[string]interface{}{})
+
+	g := graph.NewGraph()
+	if err := g.AddResource(
+		resourcetest.Bucket("logs").Prop(p.ObjectCount, 2500).Prop(p.Size, 7500).Build(),
+		resourcetest.Bucket("empty").Prop(p.ObjectCount, 0).Prop(p.Size, 0).Build(),
+	); err != nil {
+		t.Fatal(err)
+	}
+	stats := syncStats("storage", g)
+	if got := stats.Resources["s3object"]; got != 2500 {
+		t.Errorf("got %d s3objects, want 2500", got)
+	}
+	if got, want := stats.String(), "storage: 2 buckets, 2500 s3objects"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 func TestCheckFormat(t *testing.T) {
 	prev := formatGlobalFlag
 	t.Cleanup(func() { formatGlobalFlag = prev })

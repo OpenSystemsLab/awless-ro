@@ -149,6 +149,7 @@ const (
 	NewInstancesProtected             = "cloud:newInstancesProtected"
 	Notifications                     = "cloud:notifications"
 	OKActions                         = "cloud:okActions"
+	ObjectCount                       = "cloud:objectCount"
 	OptionGroups                      = "cloud:optionGroups"
 	Origins                           = "cloud:origins"
 	OutboundRules                     = "net:outboundRules"
@@ -364,6 +365,7 @@ func init() {
 		properties.NewInstancesProtected:             NewInstancesProtected,
 		properties.Notifications:                     Notifications,
 		properties.OKActions:                         OKActions,
+		properties.ObjectCount:                       ObjectCount,
 		properties.OptionGroups:                      OptionGroups,
 		properties.Origins:                           Origins,
 		properties.OutboundRules:                     OutboundRules,
@@ -579,6 +581,7 @@ var Properties = RDFProperties{
 	NewInstancesProtected:             {ID: NewInstancesProtected, RdfType: "rdf:Property", RdfsLabel: "NewInstancesProtected", RdfsDefinedBy: "rdfs:Literal", RdfsDataType: "xsd:boolean"},
 	Notifications:                     {ID: Notifications, RdfType: "rdf:Property", RdfsLabel: "Notifications", RdfsDefinedBy: "rdfs:list", RdfsDataType: "rdfs:Class"},
 	OKActions:                         {ID: OKActions, RdfType: "rdf:Property", RdfsLabel: "OKActions", RdfsDefinedBy: "rdfs:list", RdfsDataType: "xsd:string"},
+	ObjectCount:                       {ID: ObjectCount, RdfType: "rdf:Property", RdfsLabel: "ObjectCount", RdfsDefinedBy: "rdfs:Literal", RdfsDataType: "xsd:int"},
 	OptionGroups:                      {ID: OptionGroups, RdfType: "rdf:Property", RdfsLabel: "OptionGroups", RdfsDefinedBy: "rdfs:list", RdfsDataType: "xsd:string"},
 	Origins:                           {ID: Origins, RdfType: "rdf:Property", RdfsLabel: "Origins", RdfsDefinedBy: "rdfs:list", RdfsDataType: "cloud-owl:DistributionOrigin"},
 	OutboundRules:                     {ID: OutboundRules, RdfType: "rdf:Property", RdfsLabel: "OutboundRules", RdfsDefinedBy: "rdfs:list", RdfsDataType: "net-owl:FirewallRule"},

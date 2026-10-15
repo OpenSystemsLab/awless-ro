@@ -814,36 +814,48 @@ func TestBuildStorageRdfGraph(t *testing.T) {
 		},
 	}
 
-	mocks3 := &mockS3{manualS3Mock: manualS3Mock{buckets: buckets, objects: objects, grants: bucketsACL}}
-	StorageService = mocks3
-	storage := Storage{
-		S3API:   mocks3,
-		region:  "eu-west-1",
-		fetcher: fetch.NewFetcher(awsfetch.BuildStorageFetchFuncs(awsfetch.NewConfig(&awsfetch.AWSAPI{S3: mocks3}))),
-	}
+	// A sync keeps the number and size of each bucket's objects on the bucket, and the
+	// objects themselves only when aws.storage.s3object.keep is set.
+	for _, keep := range []bool{false, true} {
+		t.Run(fmt.Sprintf("keep=%t", keep), func(t *testing.T) {
+			mocks3 := &mockS3{manualS3Mock: manualS3Mock{buckets: buckets, objects: objects, grants: bucketsACL}}
+			StorageService = mocks3
+			conf := awsfetch.NewConfig(&awsfetch.AWSAPI{S3: mocks3})
+			conf.Extra["aws.storage.s3object.keep"] = keep
+			storage := Storage{
+				S3API:   mocks3,
+				region:  "eu-west-1",
+				fetcher: fetch.NewFetcher(awsfetch.BuildStorageFetchFuncs(conf)),
+			}
 
-	g, err := storage.Fetch(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	resources, err := g.Find(cloud.NewQuery("region", "bucket"))
-	if err != nil {
-		t.Fatal(err)
-	}
+			g, err := storage.Fetch(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			resources, err := g.Find(cloud.NewQuery("region", "bucket"))
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	expected := map[string]cloud.Resource{
-		"eu-west-1":   resourcetest.Region("eu-west-1").Build(),
-		"bucket_eu_1": resourcetest.Bucket("bucket_eu_1").Prop(p.Grants, []*graph.Grant{{Grantee: graph.Grantee{GranteeID: "usr_2"}, Permission: "Write"}}).Build(),
-		"bucket_eu_2": resourcetest.Bucket("bucket_eu_2").Prop(p.Grants, []*graph.Grant{{Grantee: graph.Grantee{GranteeID: "usr_1"}, Permission: "Write"}}).Build(),
-	}
-	expectedChildren := map[string][]string{
-		"eu-west-1":   {"bucket_eu_1", "bucket_eu_2"},
-		"bucket_eu_1": {"obj_4"},
-		"bucket_eu_2": {"obj_5", "obj_6"},
-	}
-	expectedAppliedOn := map[string][]string{}
+			expected := map[string]cloud.Resource{
+				"eu-west-1": resourcetest.Region("eu-west-1").Build(),
+				"bucket_eu_1": resourcetest.Bucket("bucket_eu_1").Prop(p.Grants, []*graph.Grant{{Grantee: graph.Grantee{GranteeID: "usr_2"}, Permission: "Write"}}).
+					Prop(p.ObjectCount, 1).Prop(p.Size, 0).Build(),
+				"bucket_eu_2": resourcetest.Bucket("bucket_eu_2").Prop(p.Grants, []*graph.Grant{{Grantee: graph.Grantee{GranteeID: "usr_1"}, Permission: "Write"}}).
+					Prop(p.ObjectCount, 2).Prop(p.Size, 0).Build(),
+			}
+			expectedChildren := map[string][]string{
+				"eu-west-1": {"bucket_eu_1", "bucket_eu_2"},
+			}
+			if keep {
+				expectedChildren["bucket_eu_1"] = []string{"obj_4"}
+				expectedChildren["bucket_eu_2"] = []string{"obj_5", "obj_6"}
+			}
+			expectedAppliedOn := map[string][]string{}
 
-	compareResources(t, g, resources, expected, expectedChildren, expectedAppliedOn)
+			compareResources(t, g, resources, expected, expectedChildren, expectedAppliedOn)
+		})
+	}
 }
 
 func TestBuildDnsRdfGraph(t *testing.T) {

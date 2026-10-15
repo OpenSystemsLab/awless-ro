@@ -66,3 +66,10 @@ func (c *Config) getBoolDefaultTrue(key string) bool {
 
 	return true
 }
+
+// getBool is false unless the key is set to true: for the settings that cost
+// something to turn on.
+func (c *Config) getBool(key string) bool {
+	b, _ := c.Extra[key].(bool)
+	return b
+}

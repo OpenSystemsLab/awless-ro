@@ -144,6 +144,7 @@ var PropertiesDefinitions = []property{
 	{AwlessLabel: "NewInstancesProtected", RDFLabel: fmt.Sprintf("%s:newInstancesProtected", rdf.CloudNS), RDFType: rdf.RdfProperty, RdfsDefinedBy: rdf.RdfsLiteral, RdfsDataType: rdf.XsdBoolean},
 	{AwlessLabel: "Notifications", RDFLabel: fmt.Sprintf("%s:notifications", rdf.CloudNS), RDFType: rdf.RdfProperty, RdfsDefinedBy: rdf.RdfsList, RdfsDataType: rdf.RdfsClass},
 	{AwlessLabel: "OKActions", RDFLabel: fmt.Sprintf("%s:okActions", rdf.CloudNS), RDFType: rdf.RdfProperty, RdfsDefinedBy: rdf.RdfsList, RdfsDataType: rdf.XsdString},
+	{AwlessLabel: "ObjectCount", RDFLabel: fmt.Sprintf("%s:objectCount", rdf.CloudNS), RDFType: rdf.RdfProperty, RdfsDefinedBy: rdf.RdfsLiteral, RdfsDataType: rdf.XsdInt},
 	{AwlessLabel: "OptionGroups", RDFLabel: fmt.Sprintf("%s:optionGroups", rdf.CloudNS), RDFType: rdf.RdfProperty, RdfsDefinedBy: rdf.RdfsList, RdfsDataType: rdf.XsdString},
 	{AwlessLabel: "Origins", RDFLabel: fmt.Sprintf("%s:origins", rdf.CloudNS), RDFType: rdf.RdfProperty, RdfsDefinedBy: rdf.RdfsList, RdfsDataType: rdf.DistributionOrigin},
 	{AwlessLabel: "OutboundRules", RDFLabel: fmt.Sprintf("%s:outboundRules", rdf.NetNS), RDFType: rdf.RdfProperty, RdfsDefinedBy: rdf.RdfsList, RdfsDataType: rdf.NetFirewallRule},

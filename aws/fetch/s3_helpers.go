@@ -10,6 +10,7 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	"github.com/theazz/awless-ro/aws/conv"
+	"github.com/theazz/awless-ro/cloud/properties"
 	"github.com/theazz/awless-ro/cloud/rdf"
 	"github.com/theazz/awless-ro/fetch"
 	"github.com/theazz/awless-ro/graph"
@@ -33,7 +34,25 @@ func forEachBucketParallel(ctx context.Context, cache fetch.Cache, api S3API, f 
 	})
 }
 
-func fetchObjectsForBucket(ctx context.Context, api S3API, bucket s3types.Bucket, resourcesC chan<- *graph.Resource) error {
+// fetchObjectsForBucket pages through a bucket's objects and sends the bucket with
+// two totals on it, ObjectCount and Size in bytes, which is all bucket_sizer reads.
+//
+// It used to send every object as a resource, plus a fresh copy of the bucket per
+// object, and a sync held all of them until it wrote the graph: memory grew with the
+// number of objects in the account, and a few busy buckets were enough to take a
+// 512 MiB container to its limit. The objects themselves are only sent when
+// keepObjects is set, for `list s3objects` and whoever turns on
+// aws.storage.s3object.keep.
+//
+// A listing that fails part way sends no totals, since a partial count would read as
+// the bucket's size.
+func fetchObjectsForBucket(ctx context.Context, api S3API, bucket s3types.Bucket, keepObjects bool, resourcesC chan<- *graph.Resource) error {
+	parent, err := awsconv.InitResource(bucket)
+	if err != nil {
+		return err
+	}
+
+	var count, size int
 	paginator := s3.NewListObjectsV2Paginator(api, &s3.ListObjectsV2Input{Bucket: bucket.Name})
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
@@ -41,21 +60,24 @@ func fetchObjectsForBucket(ctx context.Context, api S3API, bucket s3types.Bucket
 			return err
 		}
 		for _, output := range page.Contents {
+			count++
+			size += int(aws.ToInt64(output.Size))
+			if !keepObjects {
+				continue
+			}
 			res, err := awsconv.NewResource(output)
 			if err != nil {
 				return err
 			}
-			res.SetProperty("Bucket", aws.ToString(bucket.Name))
-			resourcesC <- res
-
-			parent, err := awsconv.InitResource(bucket)
-			if err != nil {
-				return err
-			}
+			res.SetProperty(properties.Bucket, aws.ToString(bucket.Name))
 			res.AddRelation(rdf.ChildrenOfRel, parent)
-			resourcesC <- parent
+			resourcesC <- res
 		}
 	}
+
+	parent.SetProperty(properties.ObjectCount, count)
+	parent.SetProperty(properties.Size, size)
+	resourcesC <- parent
 	return nil
 }
 
